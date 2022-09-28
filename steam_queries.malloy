@@ -1,0 +1,316 @@
+import "steam_hss.malloy"
+
+// --
+// Name: Preview the table
+query: steam_hss -> {
+  project: *
+  limit: 100
+}
+
+// --
+// Name: CPU share by vendor
+query: steam_hss {
+  declare:
+    name_value is value ?
+      pick 'Intel' when ~ r'GenuineIntel'
+      pick 'AMD' when ~ r'AuthenticAMD'
+      pick 'Apple' when ~ r'VirtualApple'
+
+  where:
+    category = 'Processor Vendor',
+    perc > 1
+
+} -> by_platform {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: name_value
+      aggregate: max_perc
+      top: 1
+    }
+  }
+  nest: by_year_line_chart is by_year + {
+    aggregate: avg_perc
+    group_by: name_value
+  }
+}
+
+// --
+// Name: CPU core count
+source: cpu_cores is from(
+  steam_hss -> {
+    declare:
+      num_cores is regexp_extract(trim(value), '\d+')::number ?
+        pick '1 cpu' when = 1
+        pick '2 cpus' when = 2
+        pick '3 cpus' when = 3
+        pick '4 cpus' when = 4
+        pick '6 cpus' when = 6
+        pick '8 cpus' when = 8
+        pick '12 cpus' when = 12
+        pick '≥16 cpus' when >= 16
+        else 'OTHER'
+
+    where:
+      category = 'Physical CPUs',
+      value != 'Unspecified',
+      platform != 'combined',
+      perc > 0.1
+
+    // add percentages of the same distro_name category
+    group_by: num_cores, date_ts is date_ts.month, platform
+    aggregate: perc is sum(perc)
+  }
+) {
+  declare:
+    avg_perc is round(avg(perc), 2)
+    max_perc is round(max(perc), 2)
+  query: by_year is {
+    // force casting to timestamp for integer date display
+    group_by: dep_year is date_ts::timestamp.year
+    order_by: dep_year asc
+  }
+  query: by_qtr is {
+    group_by: dep_qtr is date_ts.quarter
+    order_by: dep_qtr asc
+  }
+  query: by_platform is {
+    group_by: platform
+  }
+}
+query: cpu_cores -> {
+  nest: by_platform is by_platform {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: num_cores
+        aggregate: max_perc
+        top: 3
+      }
+    }
+    nest: by_qtr_bar_chart is by_year + {
+      aggregate: avg_perc
+      group_by: num_cores
+    }
+  }
+}
+
+// --
+// Name: OS share
+query: steam_hss {
+  where:
+    category = 'OS Version (total)'
+
+} -> by_platform {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: value
+      aggregate: max_perc
+      top: 3
+    }
+  }
+  nest: by_year_bar_chart is by_year + {
+    aggregate: avg_perc
+    group_by: value
+  }
+}
+
+// --
+// Name: Linux distros
+source: linux_distro is from(
+  steam_hss -> {
+    declare:
+      distro_name is regexp_replace(trim(value), ' \d.*$', '')
+
+    where:
+      category = 'Linux Version',
+      distro_name !~ r'^(Unknown|Description:Freedesktop.org|Freedesktop.org)$'
+
+    // add percentages of the same distro_name category
+    group_by: distro_name, date_ts is date_ts.month
+    aggregate: perc is sum(perc)
+  }
+) {
+  declare:
+    avg_perc is round(avg(perc), 2)
+    max_perc is round(max(perc), 2)
+  query: by_year is {
+    // force casting to timestamp for integer date display
+    group_by: dep_year is date_ts::timestamp.year
+    order_by: dep_year asc
+  }
+  query: by_qtr is {
+    group_by: dep_qtr is date_ts.quarter
+    order_by: dep_qtr asc
+  }
+}
+query: linux_distro -> {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: distro_name
+      aggregate: max_perc
+      top: 5
+    }
+  }
+  nest: by_qtr_line_chart is by_qtr + {
+    aggregate: avg_perc
+    group_by: distro_name
+  }
+}
+
+// --
+// Name: Windows OS
+source: windows_distro is from(
+  steam_hss -> {
+    declare:
+      distro_name is regexp_replace(trim(value), ' \d{2} bit$', '') ?
+        pick 'Windows XP' when ~ 'XP%'
+        pick 'Windows Me' when ~ 'Me%'
+        pick 'Windows 2000' when ~ '2000%'
+        pick 'Windows 2003' when ~ '2003%'
+        pick 'Windows 95' when ~ '95%'
+        pick 'Windows 98' when ~ '98%'
+        pick 'Windows NT' when ~ 'NT%'
+        pick regexp_replace(trim(value), ' \d{2} bit$', '') when ~ 'Windows%'
+        else 'Other'
+    where:
+      category = 'Windows Version',
+      perc > 1
+
+    // add percentages of the same distro_name category
+    group_by: distro_name, date_ts is date_ts.month
+    aggregate: perc is sum(perc)
+  }
+) {
+  declare:
+    avg_perc is round(avg(perc), 2)
+    max_perc is round(max(perc), 2)
+  query: by_year is {
+    // force casting to timestamp for integer date display
+    group_by: dep_year is date_ts::timestamp.year
+    order_by: dep_year asc
+  }
+  query: by_qtr is {
+    group_by: dep_qtr is date_ts.quarter
+    order_by: dep_qtr asc
+  }
+}
+query: windows_distro -> {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: distro_name
+      aggregate: max_perc
+      top: 5
+    }
+  }
+  nest: by_qtr_line_chart is by_qtr + {
+    aggregate: avg_perc
+    group_by: distro_name
+  }
+}
+
+// --
+// Name: Language
+query: steam_hss {
+  where:
+    category = 'Language'
+
+} -> by_platform {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: value
+      aggregate: max_perc
+      top: 3
+    }
+    order_by: 1 desc
+  }
+  nest: by_year is by_year + {
+    nest: top_10_lang_bar_chart is {
+      aggregate: avg_perc
+      group_by: value
+      top: 10
+    }
+    where: date_ts.year: @2005 | @2015 | @2022
+    order_by: 1 desc
+  }
+}
+
+// --
+// Name: Display resolution
+query: steam_hss {
+  where:
+    category = 'Primary Display Resolution'
+
+} -> by_platform {
+  nest: top_by_year is by_year + {
+    nest: max_perc_list_detail is {
+      group_by: value
+      aggregate: max_perc
+      top: 3
+    }
+    order_by: 1 desc
+  }
+  nest: by_year is by_year + {
+    nest: top_10_lang_bar_chart is {
+      aggregate: avg_perc
+      group_by: value
+      top: 10
+    }
+    where: date_ts.year: @2010 | @2015 | @2020 | @2022
+    order_by: 1 desc
+  }
+}
+
+// --
+// Name: GPU vendors
+source: gpu_vendors is from(
+  steam_hss -> {
+    declare:
+      gpu_manufacturer is trim(value) ?
+        pick 'AMD' when ~ r'(AMD|Radeon)'
+        pick 'ATI' when ~ r'(ATI|ATI Radeon)'
+        pick 'Intel' when ~ r'(Intel|Haswell)'
+        pick 'NVIDIA' when ~ r'(NVIDIA|NVidia|GeForce)'
+        pick 'Apple' when ~ r'(Apple)'
+        else 'Other'
+    where:
+      category = 'Video Card Description',
+      value != '',
+      // errors in data collected during 2015 for values 'Other' > 90%
+      perc < 90
+
+    // add percentages of the same gpu_manufacturer category
+    group_by: gpu_manufacturer, date_ts is date_ts.month, platform
+    aggregate: perc is sum(perc)
+  }
+) {
+  declare:
+    avg_perc is round(avg(perc), 2)
+    max_perc is round(max(perc), 2)
+  query: by_year is {
+    // force casting to timestamp for integer date display
+    group_by: dep_year is date_ts::timestamp.year
+    order_by: dep_year asc
+  }
+  query: by_platform is {
+    group_by: platform
+  }
+}
+query: gpu_vendors -> {
+  nest: by_platform is by_platform {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: gpu_manufacturer
+        aggregate: max_perc
+        top: 3
+      }
+    }
+    nest: by_year_bar_chart is by_year + {
+      aggregate: avg_perc
+      group_by: gpu_manufacturer
+    }
+  }
+}
+
+query: steam_hss { where: category ~ 'Video Card Description' } -> {
+  group_by: value, date_ts
+  limit: 100
+}

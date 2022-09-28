@@ -1,0 +1,8 @@
+[
+    {
+      "name": "Steam Hardware Survey",
+      "dataTables": ["steam_hss.parquet"],
+      "modelPath": "./steam_hss.malloy",
+      "queryPath": "./steam_queries.malloy"
+    }
+  ]

@@ -1,0 +1,23 @@
+source: steam_hss is table('duckdb:steam_hss.parquet') + {
+  declare:
+    value is `index`
+    date_ts is cast(`date` as timestamp)
+    avg_perc is round(avg(perc), 2)
+    max_perc is round(max(perc), 2)
+
+  query: by_value is {
+    group_by: value
+    aggregate: avg_perc
+  }
+  query: by_category is {
+    group_by: category
+    aggregate: avg_perc
+  }
+  query: by_platform is {
+    group_by: platform
+  }
+  query: by_year is {
+    group_by: `year` is date_ts.year
+    order_by: `year` asc
+  }
+}
