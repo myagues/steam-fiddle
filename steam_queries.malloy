@@ -28,7 +28,7 @@ query: steam_hss {
       top: 1
     }
   }
-  nest: by_year_line_chart is by_year + {
+  nest: by_year_line_chart is by_qtr + {
     aggregate: avg_perc
     group_by: name_value
   }
@@ -69,16 +69,12 @@ source: cpu_cores is from(
     group_by: dep_year is date_ts::timestamp.year
     order_by: dep_year asc
   }
-  query: by_qtr is {
-    group_by: dep_qtr is date_ts.quarter
-    order_by: dep_qtr asc
-  }
   query: by_platform is {
     group_by: platform
   }
 }
 query: cpu_cores -> {
-  nest: by_platform is by_platform {
+  nest: by_platform {
     nest: top_by_year is by_year + {
       nest: max_perc_list_detail is {
         group_by: num_cores
@@ -208,56 +204,20 @@ query: windows_distro -> {
 }
 
 // --
-// Name: Language
-query: steam_hss {
-  where:
-    category = 'Language'
+// Name: OSX Hardware Model Summary
+query: steam_hss { where: category = 'OSX Hardware Model Summary' } -> list_bar_explorer
 
-} -> by_platform {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: value
-      aggregate: max_perc
-      top: 3
-    }
-    order_by: 1 desc
-  }
-  nest: by_year is by_year + {
-    nest: top_10_lang_bar_chart is {
-      aggregate: avg_perc
-      group_by: value
-      top: 10
-    }
-    where: date_ts.year: @2005 | @2015 | @2022
-    order_by: 1 desc
-  }
-}
+// --
+// Name: System RAM
+query: steam_hss { where: category = 'System RAM' } -> list_bar_explorer
+
+// --
+// Name: Language
+query: steam_hss { where: category = 'Language' } -> list_bar_explorer
 
 // --
 // Name: Display resolution
-query: steam_hss {
-  where:
-    category = 'Primary Display Resolution'
-
-} -> by_platform {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: value
-      aggregate: max_perc
-      top: 3
-    }
-    order_by: 1 desc
-  }
-  nest: by_year is by_year + {
-    nest: top_10_lang_bar_chart is {
-      aggregate: avg_perc
-      group_by: value
-      top: 10
-    }
-    where: date_ts.year: @2010 | @2015 | @2020 | @2022
-    order_by: 1 desc
-  }
-}
+query: steam_hss { where: category = 'Primary Display Resolution' } -> list_bar_explorer
 
 // --
 // Name: GPU vendors
@@ -308,9 +268,4 @@ query: gpu_vendors -> {
       group_by: gpu_manufacturer
     }
   }
-}
-
-query: steam_hss { where: category ~ 'Video Card Description' } -> {
-  group_by: value, date_ts
-  limit: 100
 }

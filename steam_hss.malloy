@@ -1,3 +1,6 @@
+// Steam Hardware & Software Survey - https://store.steampowered.com/hwsurvey
+// data collection method and comments in https://github.com/myagues/steam-hss-data
+
 source: steam_hss is table('duckdb:steam_hss.parquet') + {
   declare:
     value is `index`
@@ -19,5 +22,30 @@ source: steam_hss is table('duckdb:steam_hss.parquet') + {
   query: by_year is {
     group_by: `year` is date_ts.year
     order_by: `year` asc
+  }
+  query: by_qtr is {
+    group_by: `qtr` is date_ts.quarter
+    order_by: `qtr` asc
+  }
+  query: list_bar_explorer is {
+    nest: by_platform_dashboard is by_platform + {
+      nest: top_by_year is by_year + {
+        nest: max_perc_list_detail is {
+          group_by: value
+          aggregate: max_perc
+          top: 3
+        }
+        order_by: 1 desc
+      }
+      nest: by_year is by_year + {
+        nest: top_10_bar_chart is {
+          aggregate: avg_perc
+          group_by: value
+          top: 10
+        }
+        where: date_ts.year: @2005 | @2010 | @2015 | @2022
+        order_by: 1 desc
+      }
+    }
   }
 }
