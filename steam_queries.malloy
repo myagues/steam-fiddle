@@ -48,7 +48,7 @@ source: cpu_cores is from(
         pick '8 cpus' when = 8
         pick '12 cpus' when = 12
         pick '≥16 cpus' when >= 16
-        else 'OTHER'
+        else 'Other'
 
     where:
       category = 'Physical CPUs',
@@ -66,7 +66,7 @@ source: cpu_cores is from(
     max_perc is round(max(perc), 2)
   query: by_year is {
     // force casting to timestamp for integer date display
-    group_by: dep_year is date_ts::timestamp.year
+    group_by: dep_year is left(date_ts::timestamp.year::string, 4)
     order_by: dep_year asc
   }
   query: by_platform is {
@@ -82,7 +82,7 @@ query: cpu_cores -> {
         top: 3
       }
     }
-    nest: by_qtr_bar_chart is by_year + {
+    nest: by_year_bar_chart is by_year + {
       aggregate: avg_perc
       group_by: num_cores
     }
@@ -212,6 +212,10 @@ query: steam_hss { where: category = 'OSX Hardware Model Summary' } -> list_bar_
 query: steam_hss { where: category = 'System RAM' } -> list_bar_explorer
 
 // --
+// Name: VRAM
+query: steam_hss { where: category = 'VRAM' } -> list_bar_explorer
+
+// --
 // Name: Language
 query: steam_hss { where: category = 'Language' } -> list_bar_explorer
 
@@ -247,7 +251,7 @@ source: gpu_vendors is from(
     max_perc is round(max(perc), 2)
   query: by_year is {
     // force casting to timestamp for integer date display
-    group_by: dep_year is date_ts::timestamp.year
+    group_by: dep_year is left(date_ts::timestamp.year::string, 4)
     order_by: dep_year asc
   }
   query: by_platform is {
