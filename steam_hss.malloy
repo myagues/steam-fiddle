@@ -3,8 +3,12 @@
 
 source: steam_hss is table('duckdb:steam_hss.parquet') + {
   declare:
-    value is `index`
     date_ts is cast(`date` as timestamp)
+
+  rename:
+    value is `index`
+
+  measure:
     avg_perc is round(avg(perc), 2)
     max_perc is round(max(perc), 2)
 
@@ -20,12 +24,12 @@ source: steam_hss is table('duckdb:steam_hss.parquet') + {
     group_by: platform
   }
   query: by_year is {
-    group_by: `year` is date_ts.year
-    order_by: `year` asc
+    group_by: dep_year is left(date_ts::timestamp.year::string, 4)
+    order_by: dep_year asc
   }
   query: by_qtr is {
-    group_by: `qtr` is date_ts.quarter
-    order_by: `qtr` asc
+    group_by: dep_qtr is date_ts.quarter
+    order_by: dep_qtr asc
   }
   query: list_bar_explorer is {
     nest: by_platform_dashboard is by_platform + {

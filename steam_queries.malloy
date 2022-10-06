@@ -10,27 +10,27 @@ query: steam_hss -> {
 // --
 // Name: CPU share by vendor
 query: steam_hss {
+  where: category = 'Processor Vendor', perc > 1
+} -> {
   declare:
-    name_value is value ?
+    cpu_vendor is value ?
       pick 'Intel' when ~ r'GenuineIntel'
       pick 'AMD' when ~ r'AuthenticAMD'
       pick 'Apple' when ~ r'VirtualApple'
 
-  where:
-    category = 'Processor Vendor',
-    perc > 1
-
-} -> by_platform {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: name_value
-      aggregate: max_perc
-      top: 1
+  nest: by_platform_dashboard is by_platform + {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: cpu_vendor
+        aggregate: max_perc
+        top: 2
+      }
+      order_by: 1 desc
     }
-  }
-  nest: by_year_line_chart is by_qtr + {
-    aggregate: avg_perc
-    group_by: name_value
+    nest: by_year_line_chart is by_qtr + {
+      aggregate: avg_perc
+      group_by: cpu_vendor
+    }
   }
 }
 
@@ -42,7 +42,7 @@ source: cpu_cores is from(
       num_cores is regexp_extract(trim(value), '\d+')::number ?
         pick '1 cpu' when = 1
         pick '2 cpus' when = 2
-        pick '3 cpus' when = 3
+        pick 'Other' when = 3
         pick '4 cpus' when = 4
         pick '6 cpus' when = 6
         pick '8 cpus' when = 8
@@ -53,7 +53,7 @@ source: cpu_cores is from(
     where:
       category = 'Physical CPUs',
       value != 'Unspecified',
-      platform != 'combined',
+      // platform != 'combined',
       perc > 0.1
 
     // add percentages of the same distro_name category
@@ -67,14 +67,12 @@ source: cpu_cores is from(
   query: by_year is {
     // force casting to timestamp for integer date display
     group_by: dep_year is left(date_ts::timestamp.year::string, 4)
-    order_by: dep_year asc
-  }
-  query: by_platform is {
-    group_by: platform
+    order_by: dep_year desc
   }
 }
 query: cpu_cores -> {
-  nest: by_platform {
+  nest: by_platform_dashboard is {
+    group_by: platform
     nest: top_by_year is by_year + {
       nest: max_perc_list_detail is {
         group_by: num_cores
@@ -85,6 +83,12 @@ query: cpu_cores -> {
     nest: by_year_bar_chart is by_year + {
       aggregate: avg_perc
       group_by: num_cores
+      order_by: 1 asc
+    }
+    nest: by_year_grid_bar_chart is by_year +{
+      group_by: num_cores
+      aggregate: avg_perc
+      order_by: dep_year, num_cores asc
     }
   }
 }
@@ -92,20 +96,21 @@ query: cpu_cores -> {
 // --
 // Name: OS share
 query: steam_hss {
-  where:
-    category = 'OS Version (total)'
-
-} -> by_platform {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: value
-      aggregate: max_perc
-      top: 3
+  where: category = 'OS Version (total)'
+} -> {
+  nest: by_platform_dashboard is by_platform {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: value
+        aggregate: max_perc
+        top: 3
+      }
+      order_by: 1 desc
     }
-  }
-  nest: by_year_bar_chart is by_year + {
-    aggregate: avg_perc
-    group_by: value
+    nest: by_year_bar_chart is by_year + {
+      aggregate: avg_perc
+      group_by: value
+    }
   }
 }
 
@@ -118,7 +123,7 @@ source: linux_distro is from(
 
     where:
       category = 'Linux Version',
-      distro_name !~ r'^(Unknown|Description:Freedesktop.org|Freedesktop.org)$'
+      distro_name !~ r'^(Unknown|Description:Freedesktop.org|Freedesktop.org)'
 
     // add percentages of the same distro_name category
     group_by: distro_name, date_ts is date_ts.month
@@ -131,7 +136,7 @@ source: linux_distro is from(
   query: by_year is {
     // force casting to timestamp for integer date display
     group_by: dep_year is date_ts::timestamp.year
-    order_by: dep_year asc
+    order_by: dep_year desc
   }
   query: by_qtr is {
     group_by: dep_qtr is date_ts.quarter
@@ -139,16 +144,18 @@ source: linux_distro is from(
   }
 }
 query: linux_distro -> {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: distro_name
-      aggregate: max_perc
-      top: 5
+  nest: linux_distro_dashboard is {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: distro_name
+        aggregate: max_perc
+        top: 5
+      }
     }
-  }
-  nest: by_qtr_line_chart is by_qtr + {
-    aggregate: avg_perc
-    group_by: distro_name
+    nest: by_qtr_line_chart is by_qtr + {
+      aggregate: avg_perc
+      group_by: distro_name
+    }
   }
 }
 
@@ -167,6 +174,7 @@ source: windows_distro is from(
         pick 'Windows NT' when ~ 'NT%'
         pick regexp_replace(trim(value), ' \d{2} bit$', '') when ~ 'Windows%'
         else 'Other'
+
     where:
       category = 'Windows Version',
       perc > 1
@@ -182,7 +190,7 @@ source: windows_distro is from(
   query: by_year is {
     // force casting to timestamp for integer date display
     group_by: dep_year is date_ts::timestamp.year
-    order_by: dep_year asc
+    order_by: dep_year desc
   }
   query: by_qtr is {
     group_by: dep_qtr is date_ts.quarter
@@ -190,16 +198,18 @@ source: windows_distro is from(
   }
 }
 query: windows_distro -> {
-  nest: top_by_year is by_year + {
-    nest: max_perc_list_detail is {
-      group_by: distro_name
-      aggregate: max_perc
-      top: 5
+  nest: windows_os_dashboard is {
+    nest: top_by_year is by_year + {
+      nest: max_perc_list_detail is {
+        group_by: distro_name
+        aggregate: max_perc
+        top: 5
+      }
     }
-  }
-  nest: by_qtr_line_chart is by_qtr + {
-    aggregate: avg_perc
-    group_by: distro_name
+    nest: by_qtr_line_chart is by_qtr + {
+      aggregate: avg_perc
+      group_by: distro_name
+    }
   }
 }
 
@@ -232,12 +242,11 @@ source: gpu_vendors is from(
         pick 'AMD' when ~ r'(AMD|Radeon)'
         pick 'ATI' when ~ r'(ATI|ATI Radeon)'
         pick 'Intel' when ~ r'(Intel|Haswell)'
-        pick 'NVIDIA' when ~ r'(NVIDIA|NVidia|GeForce)'
+        pick 'NVIDIA' when ~ r'(NVIDIA|NVidia|GeForce|Geforce)'
         pick 'Apple' when ~ r'(Apple)'
         else 'Other'
     where:
       category = 'Video Card Description',
-      value != '',
       // errors in data collected during 2015 for values 'Other' > 90%
       perc < 90
 
@@ -252,14 +261,12 @@ source: gpu_vendors is from(
   query: by_year is {
     // force casting to timestamp for integer date display
     group_by: dep_year is left(date_ts::timestamp.year::string, 4)
-    order_by: dep_year asc
-  }
-  query: by_platform is {
-    group_by: platform
+    order_by: dep_year desc
   }
 }
 query: gpu_vendors -> {
-  nest: by_platform is by_platform {
+  nest: by_platform_dashboard is {
+    group_by: platform
     nest: top_by_year is by_year + {
       nest: max_perc_list_detail is {
         group_by: gpu_manufacturer
@@ -270,6 +277,17 @@ query: gpu_vendors -> {
     nest: by_year_bar_chart is by_year + {
       aggregate: avg_perc
       group_by: gpu_manufacturer
+      order_by: 1 asc
     }
   }
 }
+
+// --
+// Name: Popular GPUs
+query: steam_hss {
+  where:
+    category = 'Video Card Description',
+    value != 'Other',
+      // errors in data collected during 2015 for values 'Other' > 90%
+    perc < 90
+} -> list_bar_explorer
